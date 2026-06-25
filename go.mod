@@ -1,4 +1,4 @@
-module github.com/lifeashansen/ctraderjson
+module github.com/havvvsen/ctraderjson
 
 go 1.26.3
 
