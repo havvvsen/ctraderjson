@@ -3,22 +3,23 @@ package ctrader
 import (
 	"bufio"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"net"
+	"time"
 
 	"google.golang.org/protobuf/proto"
 )
-
-// type CtraderMessage interface{}
 
 type Message struct {
 	ClientMsgId string `json:"clientMsgId"`
 	PayloadType int    `json:"payloadType"`
 	Payload     string `json:"payload"`
 }
+
 
 type Client struct {
 	ApplicationClientId     string
@@ -28,8 +29,9 @@ type Client struct {
 	RefreshToken            string
 	Logger                  *slog.Logger
 	Live                    bool
-	Conn                    *net.Conn
+	Conn                    net.Conn
 	HandlerFunc             func(proto.Message)
+	Deadline                time.Duration
 }
 
 func (c *Client) Start() error {
@@ -41,16 +43,15 @@ func (c *Client) Start() error {
 		host = "demo.ctraderapi.com:5036"
 	}
 
-	conn, err := net.Dial("tcp", host)
+	conn, err := net.DialTimeout("tcp", host, c.Deadline)
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
 
-	c.Conn = &conn
+	c.Conn = conn
 	c.Logger.Info("Connected to ctrader successfully")
 
-	reader := bufio.NewReader(*c.Conn)
+	reader := bufio.NewReader(c.Conn)
 
 	for {
 		msg, err := reader.ReadBytes('}')
@@ -70,20 +71,33 @@ func (c *Client) Start() error {
 }
 
 func (c *Client) Stop() error {
+	if err := c.Conn.Close(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (c *Client) keepAlive() {
+	ticker := time.Tick(time.Second * 10)
+	protoHeartBeatEvent :=Message {
+		ClientMsgId: fmt.Sprintf("id-%d", rand.Intn(492)),
+		PayloadType: ,
+	}
+
+	for _ = range ticker {
+		c.Send(context.Background())
+
+	}
 
 }
 
-func (c *Client) Send(ctx context.Context, conn net.Conn, msg Message) error {
+func (c *Client) Send(ctx context.Context, msg Message) error {
 	messageRaw, err := json.Marshal(msg)
 	if err != nil {
 		return err
 	}
 
-	conn.Write(messageRaw)
+	c.Conn.Write(messageRaw)
 
 	return nil
-}
